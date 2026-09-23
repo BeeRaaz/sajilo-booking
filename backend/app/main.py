@@ -1,7 +1,12 @@
-from fastapi import FastAPI
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import settings
+from app.db import get_session
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -22,3 +27,25 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Sajilo Booking API!"}
+
+
+@app.get("/health-check")
+async def health_check(session: Annotated[AsyncSession, Depends(get_session)]):
+    """Health Check endpoint to check the database connectivity"""
+
+    try:
+        await session.execute(text("SELECT 1"))
+
+        return {
+            "status": "healthy",
+            "database": "connected",
+        }
+
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unhealthy",
+                "database": "disconnected",
+            },
+        )
