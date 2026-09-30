@@ -12,7 +12,6 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
-        index=True,
         default=uuid.uuid4,
     )
     first_name: Mapped[str] = mapped_column(

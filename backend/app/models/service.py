@@ -13,7 +13,6 @@ class Service(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
-        index=True,
         default=uuid.uuid4,
     )
     business_id: Mapped[uuid.UUID] = mapped_column(
@@ -21,6 +20,7 @@ class Service(Base):
             "businesses.id",
             ondelete="CASCADE",
         ),
+        index=True,
         nullable=False,
     )
     name: Mapped[str] = mapped_column(

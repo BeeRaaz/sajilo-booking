@@ -12,7 +12,6 @@ class Business(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
-        index=True,
         default=uuid.uuid4,
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
@@ -20,6 +19,7 @@ class Business(Base):
             "users.id",
             ondelete="RESTRICT",
         ),
+        index=True,
         nullable=False,
     )
     name: Mapped[str] = mapped_column(

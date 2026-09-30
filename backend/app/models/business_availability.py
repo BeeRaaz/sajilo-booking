@@ -1,8 +1,8 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import time
 
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import ForeignKey, Time
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -23,7 +23,6 @@ class BusinessAvailability(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
-        nullable=False,
         default=uuid.uuid4,
     )
     business_id: Mapped[uuid.UUID] = mapped_column(
@@ -31,16 +30,17 @@ class BusinessAvailability(Base):
             "businesses.id",
             ondelete="CASCADE",
         ),
+        index=True,
         nullable=False,
     )
     day_of_week: Mapped[WeekDays] = mapped_column(
         nullable=False,
     )
-    start_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+    start_time: Mapped[time] = mapped_column(
+        Time,
         nullable=False,
     )
-    end_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+    end_time: Mapped[time] = mapped_column(
+        Time,
         nullable=False,
     )

@@ -20,7 +20,6 @@ class Booking(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
-        index=True,
         default=uuid.uuid4,
     )
     service_id: Mapped[uuid.UUID] = mapped_column(
