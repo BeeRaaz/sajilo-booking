@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Sajilo Booking API"
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # Database Settings
     DATABASE_URL: str

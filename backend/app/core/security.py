@@ -1,7 +1,8 @@
 import datetime
 import uuid
-from typing import Literal
+from dataclasses import dataclass
 
+import argon2
 import jwt
 from argon2 import PasswordHasher
 
@@ -12,17 +13,27 @@ ph = PasswordHasher()
 ALGORITHM = "HS256"
 
 
+@dataclass
+class TokenClass:
+    token: str
+    jti: str
+    expire: datetime.datetime
+
+
 def hash_password(password: str) -> str:
     return ph.hash(password)
 
 
-def verify_password(password: str, password_hash: str) -> Literal[True]:
-    return ph.verify(password_hash, password)
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return ph.verify(password_hash, password)
+    except argon2.exceptions.VerifyMismatchError:
+        return False
 
 
 def _create_token(
     user_id: uuid.UUID, token_type: str, expires_delta: datetime.timedelta
-) -> tuple[str, str]:
+) -> TokenClass:
     now = datetime.datetime.now(datetime.UTC)
     expire = now + expires_delta
     jti = str(uuid.uuid4())
@@ -41,32 +52,31 @@ def _create_token(
         algorithm=ALGORITHM,
     )
 
-    return token, jti
+    return TokenClass(
+        token=token,
+        jti=jti,
+        expire=expire,
+    )
 
 
 def create_access_token(
     user_id: uuid.UUID,
-) -> str:
-    token, _ = _create_token(
+) -> TokenClass:
+    return _create_token(
         user_id,
         "access",
         datetime.timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
-    return token
-
 
 def create_refresh_token(
     user_id: uuid.UUID,
-) -> str:
-
-    token, _ = _create_token(
+) -> TokenClass:
+    return _create_token(
         user_id,
         "refresh",
         datetime.timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
-
-    return token
 
 
 def decode_token(token: str) -> dict:

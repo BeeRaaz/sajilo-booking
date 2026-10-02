@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.deps import get_auth_service
 from app.models import User
-from app.schemas import UserCreate, UserRead
+from app.schemas import TokenResponse, UserCreate, UserLogin, UserRead
 from app.services import AuthService
 
 auth_router = APIRouter(
@@ -30,3 +30,21 @@ async def signup(
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+
+
+@auth_router.post(
+    "/login", response_model=TokenResponse, status_code=status.HTTP_200_OK
+)
+async def login(
+    payload: UserLogin,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+):
+    access_token, refresh_token = await service.login_user(
+        email=payload.email,
+        password=payload.password,
+    )
+
+    return TokenResponse(
+        access_token=access_token.token,
+        refresh_token=refresh_token.token,
+    )
