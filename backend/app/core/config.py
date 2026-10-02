@@ -1,7 +1,13 @@
+import os
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parents[2]  # app/core/config.py -> backend/
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+_env_file = BASE_DIR / (".env.test" if ENVIRONMENT == "test" else ".env")
 
 
 class Settings(BaseSettings):
@@ -23,10 +29,19 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = []
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_env_file,
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def guard_test_database(cls, value: str, info) -> str:
+        if info.data.get("ENVIRONMENT") == "test" and "_test" not in value:
+            raise ValueError(
+                "ENVIRONMENT=test requires a database name containing '_test'"
+            )
+        return value
 
 
 @lru_cache
