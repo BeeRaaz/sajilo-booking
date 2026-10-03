@@ -1,5 +1,6 @@
 from sqlalchemy import select
 
+from app.core.security import decode_token
 from app.models import RefreshToken, User
 
 
@@ -238,6 +239,125 @@ async def test_token_refresh_wrong_token_type(client):
         "/auth/refresh",
         json={
             "refresh_token": login_response.json()["access_token"],
+        },
+    )
+
+    assert refresh_response.status_code == 401
+
+
+async def test_logout_revokes_token(client, db_session):
+    signup_payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "logoutrevoke@example.com",
+        "password": "a-strong-password123",
+    }
+    await client.post("/auth/signup", json=signup_payload)
+
+    login_response = await client.post(
+        "/auth/login",
+        json={
+            "email": signup_payload["email"],
+            "password": signup_payload["password"],
+        },
+    )
+
+    refresh_token = login_response.json()["refresh_token"]
+
+    logout_response = await client.post(
+        "/auth/logout",
+        json={
+            "refresh_token": refresh_token,
+        },
+    )
+    assert logout_response.status_code == 204
+
+    payload = decode_token(refresh_token)
+    stored = await db_session.execute(
+        select(RefreshToken).where(RefreshToken.jti == payload["jti"])
+    )
+    token_row = stored.scalar_one()
+    assert token_row.revoked is True
+
+
+async def test_logout_twice_is_idempotent(client):
+    signup_payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "logouttwice@example.com",
+        "password": "a-strong-password123",
+    }
+    await client.post("/auth/signup", json=signup_payload)
+
+    login_response = await client.post(
+        "/auth/login",
+        json={
+            "email": signup_payload["email"],
+            "password": signup_payload["password"],
+        },
+    )
+
+    refresh_token = login_response.json()["refresh_token"]
+
+    first = await client.post(
+        "/auth/logout",
+        json={
+            "refresh_token": refresh_token,
+        },
+    )
+    second = await client.post(
+        "/auth/logout",
+        json={
+            "refresh_token": refresh_token,
+        },
+    )
+
+    assert first.status_code == 204
+    assert second.status_code == 204
+
+
+async def test_logout_with_wrong_token_still_succeeds(client):
+    response = await client.post(
+        "/auth/logout",
+        json={
+            "refresh_token": "this-is-not-a-real-jwt",
+        },
+    )
+    assert response.status_code == 204
+
+
+async def test_logout_then_refresh_fails(client):
+    signup_payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "logoutthenrefresh@example.com",
+        "password": "a-strong-password123",
+    }
+    await client.post("/auth/signup", json=signup_payload)
+
+    login_response = await client.post(
+        "/auth/login",
+        json={
+            "email": signup_payload["email"],
+            "password": signup_payload["password"],
+        },
+    )
+
+    refresh_token = login_response.json()["refresh_token"]
+
+    logout_response = await client.post(
+        "/auth/logout",
+        json={
+            "refresh_token": refresh_token,
+        },
+    )
+
+    assert logout_response.status_code == 204
+
+    refresh_response = await client.post(
+        "/auth/refresh",
+        json={
+            "refresh_token": refresh_token,
         },
     )
 
