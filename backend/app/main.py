@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import settings
 from app.db import get_session
+from app.routers import auth_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -22,6 +23,8 @@ app.add_middleware(
     allow_headers=["*"],
     allow_methods=["*"],
 )
+
+app.include_router(auth_router)
 
 
 @app.get("/")
