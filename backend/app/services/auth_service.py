@@ -1,8 +1,14 @@
+import uuid
+
+import jwt
+from jwt.exceptions import InvalidTokenError
+
 from app.core.exceptions import InvalidCredentialsError
 from app.core.logging import logger
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    decode_token,
     hash_password,
     verify_password,
 )
@@ -79,4 +85,41 @@ class AuthService:
         await self.refresh_token_repository.commit()
 
         logger.info(f"Created jwt tokens for the user: {user.id}")
+        return at, rt
+
+    async def refresh_tokens(self, refresh_token: str):
+        try:
+            payload = decode_token(refresh_token)
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
+            logger.warning("Refresh attempted with invalid or expired token")
+            raise InvalidTokenError("Invalid or expired refresh token") from e
+
+        if payload.get("type") != "refresh":
+            logger.warning("Refresh attempted with a non-refresh token")
+            raise InvalidTokenError("Invalid or expired refresh token")
+
+        stored_token = await self.refresh_token_repository.get_by_jti(payload["jti"])
+
+        if not stored_token or stored_token.revoked:
+            logger.warning(
+                f"Refresh attempted with unknown or revoked jti: {payload['jti']}"
+            )
+            raise InvalidTokenError("Invalid or expired refresh token")
+
+        # Rotate: kill the old token
+        stored_token.revoked = True
+
+        user_id = uuid.UUID(payload["sub"])
+        at = create_access_token(user_id=user_id)
+        rt = create_refresh_token(user_id=user_id)
+
+        await self.refresh_token_repository.create(
+            user_id=user_id,
+            jti=rt.jti,
+            expires_at=rt.expire,
+        )
+        await self.refresh_token_repository.commit()
+
+        logger.info(f"Rotated refresh token for user: {user_id}")
+
         return at, rt
