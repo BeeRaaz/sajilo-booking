@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.exceptions import InvalidCredentialsError
 from app.deps import get_auth_service
 from app.models import User
 from app.schemas import TokenResponse, UserCreate, UserLogin, UserRead
@@ -39,10 +40,16 @@ async def login(
     payload: UserLogin,
     service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    access_token, refresh_token = await service.login_user(
-        email=payload.email,
-        password=payload.password,
-    )
+    try:
+        access_token, refresh_token = await service.login_user(
+            email=payload.email,
+            password=payload.password,
+        )
+
+    except InvalidCredentialsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)
+        ) from e
 
     return TokenResponse(
         access_token=access_token.token,
