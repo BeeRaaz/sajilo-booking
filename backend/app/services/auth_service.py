@@ -1,9 +1,8 @@
 import uuid
 
 import jwt
-from jwt.exceptions import InvalidTokenError
 
-from app.core.exceptions import InvalidCredentialsError
+from app.core.exceptions import InvalidCredentialsError, InvalidTokenError
 from app.core.logging import logger
 from app.core.security import (
     create_access_token,
@@ -123,3 +122,32 @@ class AuthService:
         logger.info(f"Rotated refresh token for user: {user_id}")
 
         return at, rt
+
+    async def logout_user(self, refresh_token: str):
+        try:
+            payload = decode_token(refresh_token)
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            logger.info(
+                "Logout attempted with an invalid or expired token; already effectively logged out"
+            )
+            return
+
+        if payload.get("type") != "refresh":
+            logger.warning("Logout attempted with a non-refresh token; ignoring")
+            return
+
+        stored_token = await self.refresh_token_repository.get_by_jti(
+            jti=payload["jti"]
+        )
+
+        if not stored_token or stored_token.revoked:
+            logger.info(
+                f"Logout attempted for unknown or already-revoked jti: {payload['jti']}"
+            )
+            return
+
+        # Kill the stored_token
+        stored_token.revoked = True
+        await self.refresh_token_repository.commit()
+
+        logger.info(f"Logged out user, revoked jti: {payload['jti']}")
