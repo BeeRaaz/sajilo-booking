@@ -44,11 +44,11 @@ async def health_check(session: Annotated[AsyncSession, Depends(get_session)]):
             "database": "connected",
         }
 
-    except Exception:
+    except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "status": "unhealthy",
                 "database": "disconnected",
             },
-        )
+        ) from err
