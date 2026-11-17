@@ -128,7 +128,8 @@ class AuthService:
             payload = decode_token(refresh_token)
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
             logger.info(
-                "Logout attempted with an invalid or expired token; already effectively logged out"
+                "Logout attempted with an invalid or expired token; "
+                "already effectively logged out"
             )
             return
 
