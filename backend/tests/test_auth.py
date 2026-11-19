@@ -36,6 +36,30 @@ async def test_signup_duplicate_email(client):
     assert second.status_code == 409
 
 
+async def test_signup_duplicate_email_case_insensitive(client):
+    signup_payload_first = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "Test@example.com",
+        "password": "test-user-password@123",
+    }
+
+    signup_payload_second = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "test@example.com",
+        "password": "test-user-password@123",
+    }
+
+    response_first = await client.post("/auth/signup", json=signup_payload_first)
+
+    assert response_first.status_code == 201
+
+    response_second = await client.post("/auth/signup", json=signup_payload_second)
+
+    assert response_second.status_code == 409
+
+
 async def test_login_success(client):
     signup_payload = {
         "first_name": "Test",
@@ -92,6 +116,65 @@ async def test_login_nonexistent_email(client):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid credentials"
+
+
+async def test_login_mixed_case_email(client):
+    signup_payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "tEsTmiXedCase@ExamplE.COM",
+        "password": "a-strong-password123",
+    }
+
+    signup_response = await client.post("/auth/signup", json=signup_payload)
+
+    assert signup_response.status_code == 201
+    assert signup_response.json()["email"] == "testmixedcase@example.com"
+
+    response = await client.post(
+        "/auth/login",
+        json={
+            "email": "testmixedcase@example.com",
+            "password": signup_payload["password"],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["token_type"] == "bearer"
+
+
+async def test_login_email_with_surrounding_whitespace(client):
+    signup_payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "whitespace@example.com",
+        "password": "a-strong-password123",
+    }
+
+    await client.post("/auth/signup", json=signup_payload)
+
+    response = await client.post(
+        "/auth/login",
+        json={
+            "email": "  whitespace@example.com  ",
+            "password": signup_payload["password"],
+        },
+    )
+
+    assert response.status_code == 200
+
+
+async def test_login_non_string_email_returns_422(client):
+    for bad_email in (None, 123):
+        response = await client.post(
+            "/auth/login",
+            json={"email": bad_email, "password": "whatever"},
+        )
+
+        assert response.status_code == 422
 
 
 async def test_login_creates_refresh_token_row(client, db_session):
