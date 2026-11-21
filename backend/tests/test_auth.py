@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import pytest
 from sqlalchemy import select
@@ -273,6 +274,42 @@ async def test_login_non_string_email_returns_422(client):
         )
 
         assert response.status_code == 422
+
+
+async def test_auth_logs_do_not_contain_email_addresses(client, caplog, monkeypatch):
+    caplog.set_level(logging.INFO)
+    email = "piilogcheck@example.com"
+    other_email = "piilogunknown@example.com"
+    payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": email,
+        "password": "pii-log-password@123",
+    }
+
+    # signup, duplicate signup (pre-check path)
+    assert (await client.post("/auth/signup", json=payload)).status_code == 201
+    assert (await client.post("/auth/signup", json=payload)).status_code == 409
+
+    # duplicate signup that slips past the pre-check (race path)
+    async def precheck_finds_nothing(self, user_email):
+        return None
+
+    with monkeypatch.context() as m:
+        m.setattr(UserRepository, "get_by_email", precheck_finds_nothing)
+        assert (await client.post("/auth/signup", json=payload)).status_code == 409
+
+    # wrong password, unknown account
+    wrong = {"email": email, "password": "not-the-password"}
+    assert (await client.post("/auth/login", json=wrong)).status_code == 401
+    unknown = {"email": other_email, "password": "whatever-password"}
+    assert (await client.post("/auth/login", json=unknown)).status_code == 401
+
+    assert email not in caplog.text
+    assert other_email not in caplog.text
+    assert "@example.com" not in caplog.text
+    # Sanity check: logging is actually captured, so the asserts above mean something.
+    assert "Login attempt" in caplog.text
 
 
 async def test_login_creates_refresh_token_row(client, db_session):
