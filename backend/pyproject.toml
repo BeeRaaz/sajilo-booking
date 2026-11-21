@@ -20,6 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.17.5",
@@ -34,6 +35,9 @@ asyncio_default_test_loop_scope = "session"
 [tool.ruff]
 line-length = 88
 indent-width = 4
+# Apply the excludes below even when a file is passed explicitly (pre-commit
+# does this), otherwise generated migrations would get reformatted.
+force-exclude = true
 extend-exclude = [
   ".venv",
   "venv",
