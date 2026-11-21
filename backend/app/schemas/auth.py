@@ -2,7 +2,11 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr
+from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
+
+PASSWORD_MIN_LENGTH = 12
+# Upper bound so nobody can make the server hash a huge "password".
+PASSWORD_MAX_LENGTH = 128
 
 
 def _normalize_email(value: Any) -> Any:
@@ -20,7 +24,9 @@ class UserCreate(BaseModel):
     first_name: str
     last_name: str
     email: NormalizedEmail
-    password: str
+    password: Annotated[
+        str, Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+    ]
 
 
 class UserRead(BaseModel):
