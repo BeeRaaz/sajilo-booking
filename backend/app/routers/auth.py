@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.exceptions import InvalidCredentialsError, InvalidTokenError
-from app.deps import get_auth_service
+from app.deps import CurrentUser, get_auth_service
 from app.models import User
 from app.schemas import (
     RefreshTokenRequest,
@@ -94,3 +94,8 @@ async def logout(
     ],
 ) -> None:
     await service.logout_user(refresh_token=payload.refresh_token)
+
+
+@auth_router.get("/me", response_model=UserRead, status_code=status.HTTP_200_OK)
+async def read_current_user(current_user: CurrentUser) -> User:
+    return current_user
