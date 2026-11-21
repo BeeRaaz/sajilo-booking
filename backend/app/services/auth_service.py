@@ -38,7 +38,10 @@ class AuthService:
         existing_user = await self.user_repository.get_by_email(email)
 
         if existing_user:
-            logger.warning(f"Signup attempt with existing email: {email}")
+            logger.warning(
+                f"Signup attempt with an already registered email: "
+                f"existing user id={existing_user.id}"
+            )
             raise ValueError("User with this email already exists")
 
         # Hash the password
@@ -57,7 +60,7 @@ class AuthService:
             await self.user_repository.commit()
         except IntegrityError as e:
             await self.user_repository.rollback()
-            logger.warning(f"Signup lost a race on existing email: {email}")
+            logger.warning("Signup lost a race on an already registered email")
             raise ValueError("User with this email already exists") from e
 
         logger.info(f"User created successfully: id={user.id}")
@@ -71,10 +74,12 @@ class AuthService:
         # Check for existing user
         user = await self.user_repository.get_by_email(email)
 
-        if not user or not verify_password(
-            password=password, password_hash=user.password_hash
-        ):
-            logger.warning(f"Invalid login attempt for email: {email}")
+        if not user:
+            logger.warning("Login attempt for an unknown account")
+            raise InvalidCredentialsError("Invalid credentials")
+
+        if not verify_password(password=password, password_hash=user.password_hash):
+            logger.warning(f"Login attempt with a wrong password: user id={user.id}")
             raise InvalidCredentialsError("Invalid credentials")
 
         # Grant jwt tokens
