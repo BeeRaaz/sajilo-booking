@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import select
 
 from app.core.security import decode_token
@@ -58,6 +59,59 @@ async def test_signup_duplicate_email_case_insensitive(client):
     response_second = await client.post("/auth/signup", json=signup_payload_second)
 
     assert response_second.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "password",
+    ["", "a", "x" * 11, "x" * 129],
+    ids=["empty", "one-char", "11-chars", "129-chars"],
+)
+async def test_signup_rejects_invalid_password_length(client, password):
+    response = await client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "badpassword@example.com",
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 422
+    # The error must point at the password field so the client can show it.
+    assert response.json()["detail"][0]["loc"][-1] == "password"
+
+
+@pytest.mark.parametrize(
+    ("email", "password"),
+    [
+        ("exactly12@example.com", "x" * 12),
+        ("exactly128@example.com", "x" * 128),
+    ],
+    ids=["min-length", "max-length"],
+)
+async def test_signup_accepts_password_at_length_limits(client, email, password):
+    response = await client.post(
+        "/auth/signup",
+        json={
+            "first_name": "Test",
+            "last_name": "User",
+            "email": email,
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 201
+
+
+async def test_login_does_not_apply_password_length_rules(client):
+    # Length rules are for creating a password, not for checking one.
+    response = await client.post(
+        "/auth/login",
+        json={"email": "nobody@example.com", "password": "short"},
+    )
+
+    assert response.status_code == 401
 
 
 async def test_login_success(client):
