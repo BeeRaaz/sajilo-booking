@@ -1,0 +1,26 @@
+# Runs automatically on `git commit` once installed:
+#   cd backend && uv run pre-commit install
+#
+# The hooks call the ruff that is pinned in backend/uv.lock (not a separate
+# copy), so local checks, pre-commit and CI always use the same version.
+#
+# Generated Alembic migrations are skipped here on purpose: ruff only honours
+# its own `exclude` setting when run from inside backend/, but pre-commit runs
+# it from the repo root.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (backend)
+        entry: uv run --project backend ruff check --fix
+        language: system
+        types: [python]
+        files: ^backend/
+        exclude: ^backend/(alembic|\.venv)/
+      - id: ruff-format
+        name: ruff format (backend)
+        entry: uv run --project backend ruff format
+        language: system
+        types: [python]
+        files: ^backend/
+        exclude: ^backend/(alembic|\.venv)/

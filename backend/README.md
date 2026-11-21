@@ -70,3 +70,13 @@ Always open the generated file in `alembic/versions/` and check it before applyi
 uv run ruff check .        # lint (add --fix to auto-fix)
 uv run ruff format .       # format
 ```
+
+### Pre-commit hook
+
+Ruff can run automatically every time you `git commit`. Install the hook once per clone:
+
+```bash
+uv run pre-commit install
+```
+
+After that, a commit that contains Python files in `backend/` runs `ruff check --fix` and `ruff format` first. If a hook changes a file, the commit is aborted so you can review the changes, then `git add` them and commit again. To run the hooks on everything without committing: `uv run pre-commit run --all-files`.
