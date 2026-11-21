@@ -1,8 +1,11 @@
+import asyncio
+
 import pytest
 from sqlalchemy import select
 
 from app.core.security import decode_token
 from app.models import RefreshToken, User
+from app.repositories import UserRepository
 
 
 async def test_signup_sucess(client):
@@ -112,6 +115,47 @@ async def test_login_does_not_apply_password_length_rules(client):
     )
 
     assert response.status_code == 401
+
+
+async def test_signup_duplicate_email_when_precheck_misses_it(client, monkeypatch):
+    # Simulates the race: the "does this email exist?" check passes, but another
+    # request inserted the same email before our insert. The unique constraint
+    # then fails, and that must be a 409, not a 500.
+    payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "racing@example.com",
+        "password": "racing-user-password@123",
+    }
+
+    first = await client.post("/auth/signup", json=payload)
+    assert first.status_code == 201
+
+    async def precheck_finds_nothing(self, user_email):
+        return None
+
+    monkeypatch.setattr(UserRepository, "get_by_email", precheck_finds_nothing)
+
+    second = await client.post("/auth/signup", json=payload)
+
+    assert second.status_code == 409
+    assert second.json()["detail"] == "User with this email already exists"
+
+
+async def test_signup_simultaneous_requests_create_one_user(client):
+    payload = {
+        "first_name": "Test",
+        "last_name": "User",
+        "email": "simultaneous@example.com",
+        "password": "simultaneous-password@123",
+    }
+
+    responses = await asyncio.gather(
+        *(client.post("/auth/signup", json=payload) for _ in range(5))
+    )
+
+    statuses = sorted(r.status_code for r in responses)
+    assert statuses == [201, 409, 409, 409, 409]
 
 
 async def test_login_success(client):
