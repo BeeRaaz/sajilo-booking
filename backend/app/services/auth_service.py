@@ -1,6 +1,7 @@
 import uuid
 
 import jwt
+from sqlalchemy.exc import IntegrityError
 
 from app.core.exceptions import InvalidCredentialsError, InvalidTokenError
 from app.core.logging import logger
@@ -43,15 +44,21 @@ class AuthService:
         # Hash the password
         password_hash = hash_password(password)
 
-        # Create the user
-        user = await self.user_repository.create(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            password_hash=password_hash,
-        )
-
-        await self.user_repository.commit()
+        # Create the user. The check above is only a fast path: two simultaneous
+        # signups can both pass it, so the unique constraint on users.email is
+        # the real guard and we must handle it failing here.
+        try:
+            user = await self.user_repository.create(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                password_hash=password_hash,
+            )
+            await self.user_repository.commit()
+        except IntegrityError as e:
+            await self.user_repository.rollback()
+            logger.warning(f"Signup lost a race on existing email: {email}")
+            raise ValueError("User with this email already exists") from e
 
         logger.info(f"User created successfully: id={user.id}")
         return user
